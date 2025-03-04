@@ -69,7 +69,6 @@ class ValueIterationAgent:
             self.policy[state] = np.argmax(self.one_step_lookahead(state)) # select the best action
     
     def plot_metrics(self):
-        """Plot Value Function Convergence, Rewards, and Regret in a grid layout."""
         fig, axs = plt.subplots(2, 2, figsize=(12, 10))
         
         for i, values in enumerate(self.value_history[::len(self.value_history)//10]):
