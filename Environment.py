@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple, Optional
+from scipy.sparse import csr_matrix
 
 class MachineReplacementEnv:
     def __init__(
@@ -26,7 +27,24 @@ class MachineReplacementEnv:
         self.action_space = [0, 1]  # 0: continue, 1: replace
         self.observation_space = list(range(n_states))
         
+        self.create_TPM()
         self.reset()
+
+    def create_TPM(self) -> np.ndarray:
+        """Create Transition Probability Matrix for the environment"""
+        self.P = np.zeros((2, self.n_states, self.n_states))  # P[action, s, s']
+        self.q = 1 - self.p
+        for i in range(self.n_states):
+            # If action is continue (0), stays with prob q, degrades with prob p
+
+            self.P[0, i, i] = self.q
+            if i < self.n_states - 1:
+                self.P[0, i, i + 1] = self.p
+            else:
+                self.P[0, i, i] = 1  # If already at worst state, stays there
+            
+            # If action is replace (1), always resets to state 0
+            self.P[1, i, 0] = 1
     
     def h(self, s: int) -> float:
         """Operating cost function h(s) = s^2"""

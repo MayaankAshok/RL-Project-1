@@ -18,7 +18,7 @@ class QLearningAgent:
         min_epsilon: float = 0.01,
         ema_decay: float = 0.99  # EMA decay parameter
     ):
-        self.env = env
+        self.env = env      
         self.lr = learning_rate
         self.gamma = discount_factor
         self.epsilon = epsilon
