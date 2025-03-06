@@ -136,7 +136,7 @@ class PolicyIterationAgent:
                 patience_counter +=1
             else:
                 patience_counter = 0
-            if patience_counter > 100:
+            if patience_counter > 1e6:
                 policy_stable = True
             # self._policy_improvement()
             
@@ -173,7 +173,7 @@ class PolicyIterationAgent:
         print(f"Final Policy:\n{self.policy}")
         print(f"Final Value Function:\n{self.value_function}")
             
-    def moving_average(self, data: list, window: int = 10) -> np.ndarray:
+    def moving_average(self, data: list, window: int = 50) -> np.ndarray:
         """Compute moving average of data with given window size"""
         if len(data) < window:
             return np.array(data)
@@ -186,9 +186,9 @@ class PolicyIterationAgent:
         
         # Plot episode rewards
         ax1.plot(self.episode_rewards, alpha=0.6, label='Raw')
-        if len(self.episode_rewards) > 10:  # Only plot MA if enough data
+        if len(self.episode_rewards) > 50:  # Only plot MA if enough data
             ma_rewards = self.moving_average(self.episode_rewards)
-            ax1.plot(range(9, len(self.episode_rewards)), 
+            ax1.plot(range(49, len(self.episode_rewards)), 
                     ma_rewards, 'r', label='50-ep Moving Avg')
         ax1.set_title('Discounted Rewards per Iteration')
         ax1.set_xlabel('Iteration')
@@ -203,9 +203,9 @@ class PolicyIterationAgent:
         
         # Plot regrets
         ax3.plot(self.regrets, alpha=0.6, label='Raw')
-        if len(self.regrets) > 10:  # Only plot MA if enough data
+        if len(self.regrets) > 50:  # Only plot MA if enough data
             ma_regrets = self.moving_average(self.regrets)
-            ax3.plot(range(9, len(self.regrets)), 
+            ax3.plot(range(49, len(self.regrets)), 
                     ma_regrets, 'r', label='50-ep Moving Avg')
         ax3.set_title('Instantaneous Regret')
         ax3.set_xlabel('Iteration')
@@ -247,5 +247,5 @@ env = MachineReplacementEnv()
 # Create and train agent
 
 agent = PolicyIterationAgent(env)
-agent.train(1000)
+agent.train(5000)
 agent.plot_metrics()
