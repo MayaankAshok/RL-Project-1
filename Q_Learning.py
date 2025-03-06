@@ -142,8 +142,6 @@ class QLearningAgent:
             
             if (episode + 1) % 100 == 0:
                 print(f"Episode {episode + 1}/{n_episodes}")
-                print(f"Max Q diff (EMA vs Current): "
-                      f"{np.max(np.abs(self.ema_q_table - self.q_table)):.6f}")
         
         # Use EMA Q-table as final Q-table for policy and value computation
         self.q_table = self.ema_q_table.copy()
