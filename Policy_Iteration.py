@@ -12,6 +12,8 @@ class PolicyIterationAgent:
         # Initialize deterministic policy (default: continue for all states)
         self.policy = np.zeros(env.n_states, dtype=int)
         self.value_function = np.zeros(env.n_states)
+        self.policy_history = []
+        self.value_function_history = []
 
         print("Policy Iteration Agent initialized")
         print(f"Discount Factor (γ): {self.gamma}")
@@ -54,6 +56,7 @@ class PolicyIterationAgent:
                 # Update value function
                 self.value_function[s] = new_value
                 delta = max(delta, abs(v - new_value))
+        self.value_function_history.append(self.value_function.copy())
     
     def _policy_improvement(self):
         """Improve the policy based on the current value function."""
@@ -81,40 +84,13 @@ class PolicyIterationAgent:
             # Update policy
             self.policy[s] = best_action
             
+            
             # Check if policy changed
             if old_action != best_action:
                 policy_stable = False
         
+        self.policy_history.append(self.policy.copy())
         return policy_stable
-    
-    def compute_optimal_value(self, start_state: int) -> float:
-        """
-        Compute the expected value of following the current policy from start_state.
-        This uses a Monte Carlo simulation similar to the Q-Learning implementation.
-        """
-        state = start_state
-        total_reward = 0
-        discount = 1.0
-        
-        # Save the current environment state to reset later
-        env_state = self.env.state
-        self.env.reset()
-        
-        for _ in range(self.env.max_steps):
-            action = self.policy[state]
-            next_state, reward, done, _ = self.env.step(action)
-            total_reward += discount * reward
-            discount *= self.gamma
-            state = next_state
-            if done:
-                break
-        
-        # Reset environment to original state
-        self.env.reset()
-        for _ in range(env_state):
-            self.env.step(0)  # Assuming this moves the state forward
-            
-        return total_reward
     
     def train(self, n_episodes: int = 1000):
         """Train the agent using policy iteration."""
@@ -129,112 +105,61 @@ class PolicyIterationAgent:
         while not policy_stable and iteration < n_episodes:
             # Policy evaluation
             self._policy_evaluation()
-            
             # Policy improvement
-            intermediate = self._policy_improvement()
-            if intermediate:
-                patience_counter +=1
+            if not self._policy_improvement():
+                policy_stable = False
             else:
-                patience_counter = 0
-            if patience_counter > 1e6:
                 policy_stable = True
-            # self._policy_improvement()
-            
-            # Compute actual discounted reward by simulating the policy
-            discounted_reward = self.compute_optimal_value(0)
-            self.episode_rewards.append(discounted_reward)
-            
-            # Update best policy if needed
-            if discounted_reward > best_value:
-                best_value = discounted_reward
-                best_policy = self.policy.copy()
-            
-            # Calculate regret (similar to Q-learning implementation)
-            if len(self.episode_rewards) > 1:
-                prev_best = max(self.episode_rewards[:-1])
-                regret = max(0, prev_best - discounted_reward)
-            else:
-                regret = 0
-                
-            self.regrets.append(regret)
-            self.cumulative_regrets.append(sum(self.regrets))
-            self.cumulative_rewards.append(sum(self.episode_rewards))
-            
             iteration += 1
             
-            if iteration % 10 == 0:
-                print(f"Iteration {iteration}, Value: {discounted_reward:.2f}, Policy stable: {policy_stable}")
-        
-        # Set policy to best found
-        if best_policy is not None:
-            self.policy = best_policy
+
         
         print(f"Policy iteration completed after {iteration} iterations")
         print(f"Final Policy:\n{self.policy}")
         print(f"Final Value Function:\n{self.value_function}")
             
-    def moving_average(self, data: list, window: int = 50) -> np.ndarray:
-        """Compute moving average of data with given window size"""
-        if len(data) < window:
-            return np.array(data)
-        weights = np.ones(window) / window
-        return np.convolve(data, weights, mode='valid')
 
     def plot_metrics(self):
-        """Plot training metrics with moving averages"""
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        """Plot the policy and value function for every iteration."""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
         
-        # Plot episode rewards
-        ax1.plot(self.episode_rewards, alpha=0.6, label='Raw')
-        if len(self.episode_rewards) > 50:  # Only plot MA if enough data
-            ma_rewards = self.moving_average(self.episode_rewards)
-            ax1.plot(range(49, len(self.episode_rewards)), 
-                    ma_rewards, 'r', label='50-ep Moving Avg')
-        ax1.set_title('Discounted Rewards per Iteration')
-        ax1.set_xlabel('Iteration')
-        ax1.set_ylabel('Discounted Reward')
+        # Policy visualization
+        for i, policy in enumerate(self.policy_history):
+            ax1.plot(policy + i * 0.1, 'o-', label=f'Iter {i}')
+        ax1.set_title('Policy Evolution')
+        ax1.set_xlabel('Machine State')
+        ax1.set_ylabel('Action')
         ax1.legend()
         
-        # Plot cumulative rewards
-        ax2.plot(self.cumulative_rewards)
-        ax2.set_title('Cumulative Rewards')
-        ax2.set_xlabel('Iteration')
-        ax2.set_ylabel('Cumulative Reward')
+        # Value function visualization
+        for i, value_function in enumerate(self.value_function_history):
+            ax2.plot(value_function)
+        ax2.set_title('Value Function Evolution')
+        ax2.set_xlabel('Machine State')
+        ax2.set_ylabel('State Value')
+        ax2.legend()
         
-        # Plot regrets
-        ax3.plot(self.regrets, alpha=0.6, label='Raw')
-        if len(self.regrets) > 50:  # Only plot MA if enough data
-            ma_regrets = self.moving_average(self.regrets)
-            ax3.plot(range(49, len(self.regrets)), 
-                    ma_regrets, 'r', label='50-ep Moving Avg')
-        ax3.set_title('Instantaneous Regret')
-        ax3.set_xlabel('Iteration')
-        ax3.set_ylabel('Regret')
-        ax3.legend()
-        
-        # Plot cumulative regrets
-        ax4.plot(self.cumulative_regrets)
-        ax4.set_title('Cumulative Regret')
-        ax4.set_xlabel('Iteration')
-        ax4.set_ylabel('Cumulative Regret')
-        
-        # Plot the policy
-        fig2, (ax5, ax6) = plt.subplots(1, 2, figsize=(15, 6))
+        plt.tight_layout()
+        plt.show()
+
+    def plot_policy_and_value_function(self):
+        """Plot the policy and value function at each iteration"""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
         
         # Policy visualization
         states = np.arange(self.env.n_states)
-        ax5.bar(states, self.policy, color=['blue' if a == 0 else 'red' for a in self.policy])
-        ax5.set_title('Optimal Policy')
-        ax5.set_xlabel('Machine State')
-        ax5.set_ylabel('Action')
-        ax5.set_yticks([0, 1])
-        ax5.set_yticklabels(['Continue', 'Replace'])
+        ax1.bar(states, self.policy, color=['blue' if a == 0 else 'red' for a in self.policy])
+        ax1.set_title('Optimal Policy')
+        ax1.set_xlabel('Machine State')
+        ax1.set_ylabel('Action')
+        ax1.set_yticks([0, 1])
+        ax1.set_yticklabels(['Continue', 'Replace'])
         
         # Value function visualization
-        ax6.plot(states, self.value_function, 'go-')
-        ax6.set_title('Value Function')
-        ax6.set_xlabel('Machine State')
-        ax6.set_ylabel('State Value')
+        ax2.plot(states, self.value_function, 'go-')
+        ax2.set_title('Value Function')
+        ax2.set_xlabel('Machine State')
+        ax2.set_ylabel('State Value')
         
         plt.tight_layout()
         plt.show()
@@ -247,5 +172,6 @@ env = MachineReplacementEnv()
 # Create and train agent
 
 agent = PolicyIterationAgent(env)
-agent.train(5000)
+agent.train()
 agent.plot_metrics()
+agent.plot_policy_and_value_function()
